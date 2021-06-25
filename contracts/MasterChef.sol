@@ -115,14 +115,14 @@ contract MasterChef is Ownable {
     
     //update fee
     function feeUpdate(uint256 _harvestFee,uint256 _harvestFeeNative) public onlyOwner{
-        require(_harvestFee >= 0 && _harvestFee <= 300, "Not within range");
-        require(_harvestFeeNative >= 0 && _harvestFeeNative <= 300, "Not within range");
+        require(_harvestFee > 0 && _harvestFee <= 300, "Not within range");
+        require(_harvestFeeNative > 0 && _harvestFeeNative <= 300, "Not within range");
         harvestFee = _harvestFee;
         harvestFeeNative = _harvestFeeNative;
     }
 
     function updateEmissionRate(uint256 _eggpPerBlock) public onlyOwner {
-        require( _eggpPerBlock >= 0 && _eggpPerBlock <= 20*(10**18), "Not within range" );
+        require( _eggpPerBlock > 0 && _eggpPerBlock <= 20*(10**18), "Not within range" );
         massUpdatePools();
         eggpPerBlock = _eggpPerBlock;
     }
@@ -132,9 +132,9 @@ contract MasterChef is Ownable {
     // _earlyWithdrawTime is in hours.  
     // _rewardRate is the multiplier for EPRT reward rates.
     function add(uint256 _allocPoint, IBEP20 _lpToken, bool _withUpdate, uint256 _earlyWithdrawTime, uint256 _earlyWithdrawFee, uint256 _rewardRate) public onlyOwner {
-        require(_earlyWithdrawFee >= 0 && _earlyWithdrawFee <= 300, "early withdraw fee outside valid range");
-        require(_earlyWithdrawTime >= 0 && _earlyWithdrawTime <= 8760, "early withdraw timer outside valid range");  // 8760 hrs = 365 days
-        require(_rewardRate >= 0 && _rewardRate <= 2000, "invalid reward rate");  // Reward rate multiplier. Between 0 to 200%
+        require(_earlyWithdrawFee > 0 && _earlyWithdrawFee <= 300, "early withdraw fee outside valid range");
+        require(_earlyWithdrawTime > 0 && _earlyWithdrawTime <= 8760, "early withdraw timer outside valid range");  // 8760 hrs = 365 days
+        require(_rewardRate > 0 && _rewardRate <= 2000, "invalid reward rate");  // Reward rate multiplier. Between 0 to 200%
 
         if (_withUpdate) {
             massUpdatePools();
@@ -155,9 +155,9 @@ contract MasterChef is Ownable {
 
     // Update the given pool's EGGP allocation point. Can only be called by the owner.
     function set(uint256 _pid, uint256 _allocPoint, bool _withUpdate, uint256 _earlyWithdrawTime, uint256 _earlyWithdrawFee, uint256 _rewardRate) public onlyOwner {
-        require(_earlyWithdrawFee >= 0 && _earlyWithdrawFee <= 300, "early withdraw fee outside valid range");
-        require(_earlyWithdrawTime >= 0 && _earlyWithdrawTime <= 8760, "early withdraw timer outside valid range");  // 8760 hrs = 365 days
-        require(_rewardRate >= 0 && _rewardRate <= 2000, "invalid reward rate");  // Reward rate multiplier. Between 0 to 200%
+        require(_earlyWithdrawFee > 0 && _earlyWithdrawFee <= 300, "early withdraw fee outside valid range");
+        require(_earlyWithdrawTime > 0 && _earlyWithdrawTime <= 8760, "early withdraw timer outside valid range");  // 8760 hrs = 365 days
+        require(_rewardRate > 0 && _rewardRate <= 2000, "invalid reward rate");  // Reward rate multiplier. Between 0 to 200%
 
         if (_withUpdate) {
             massUpdatePools();
@@ -209,7 +209,7 @@ contract MasterChef is Ownable {
     
     //view function to see time of lastdeposit
     function getlastdeposit(uint256 _pid, address _user) external view returns (uint256) {
-        UserInfo storage user = userInfo[_pid][_user];
+        UserInfo memory user = userInfo[_pid][_user];
         return user.lastdeposit;
     }
     
@@ -268,12 +268,14 @@ contract MasterChef is Ownable {
 
         }
         if (_amount > 0) {
-            pool.lpToken.safeTransferFrom(address(msg.sender), address(this), _amount);
+            pool.lpToken.safeTransferFrom(msg.sender, address(this), _amount);
             user.amount = user.amount.add(_amount);
             user.lastdeposit=now;
 
+            // Mints a valueless token to the user as a separate reward (EPRT). The utility of the EPRT token is separate 
+            // from the user providing liquidity, therefore it does not affect the value of the LP whatsoever.
             if (pool.eprtRewardRate > 0) {
-               eprt.mint(address(msg.sender), _amount.mul(pool.eprtRewardRate).div(1000));
+               eprt.mint(msg.sender, _amount.mul(pool.eprtRewardRate).div(1000));  
             }
         }
         user.rewardDebt = user.amount.mul(pool.accEggpPerShare).div(1e12);
@@ -296,11 +298,11 @@ contract MasterChef is Ownable {
         if(_amount > 0) {
             user.amount = user.amount.sub(_amount);
             if(now>user.lastdeposit + pool.earlyWithdrawTimer ){
-                pool.lpToken.safeTransfer(address(msg.sender), _amount);
+                pool.lpToken.safeTransfer(msg.sender, _amount);
             }else{
                 uint256 fee=_amount.mul(pool.earlyWithdrawFee).div(1000);
                 uint256 withdrawableLessFee=_amount.sub(fee);
-                pool.lpToken.safeTransfer(address(msg.sender), withdrawableLessFee);
+                pool.lpToken.safeTransfer(msg.sender, withdrawableLessFee);
                 pool.lpToken.safeTransfer(address(devaddr), fee);
                 
              }
@@ -313,7 +315,7 @@ contract MasterChef is Ownable {
     function emergencyWithdraw(uint256 _pid) public {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
-        pool.lpToken.safeTransfer(address(msg.sender), user.amount);
+        pool.lpToken.safeTransfer(msg.sender, user.amount);
         emit EmergencyWithdraw(msg.sender, _pid, user.amount);
         user.amount = 0;
         user.rewardDebt = 0;
